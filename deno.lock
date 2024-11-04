@@ -520,6 +520,11 @@
       "npm:geojson@0.5",
       "npm:leaflet@^1.9.4",
       "npm:murmur-32@1"
-    ]
+    ],
+    "packageJson": {
+      "dependencies": [
+        "npm:leaflet@^1.9.4"
+      ]
+    }
   }
 }
