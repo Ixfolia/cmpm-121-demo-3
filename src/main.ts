@@ -129,5 +129,67 @@ for (let i = -NEIGHBORHOOD_SIZE; i < NEIGHBORHOOD_SIZE; i++) {
   }
 }
 
+// Define the Coordinate type for the grid cell representation
+interface Coordinate {
+  i: number;
+  j: number;
+}
+
+// Coin class represents each coin at a specific cache location
+class Coin {
+  coordinate: Coordinate;
+  serial: number;
+
+  constructor(coordinate: Coordinate, serial: number) {
+      this.coordinate = coordinate;
+      this.serial = serial;
+  }
+
+  getUniqueID(): string {
+      return `{i: ${this.coordinate.i}, j: ${this.coordinate.j}, serial: ${this.serial}}`;
+  }
+}
+
+// Flyweight Factory for Coordinates
+class CoordinateFactory {
+  private static coordinates: Map<string, Coordinate> = new Map();
+
+  static getCoordinate(lat: number, lng: number): Coordinate {
+      // Define the conversion to the global coordinate system
+      const cellSize = 0.0001; // Defines the size of each grid cell
+      const i = Math.floor(lat / cellSize);
+      const j = Math.floor(lng / cellSize);
+      const key = `${i}:${j}`;
+
+      // Use Flyweight pattern to ensure each coordinate is stored only once
+      if (!this.coordinates.has(key)) {
+          this.coordinates.set(key, { i, j });
+      }
+
+      return this.coordinates.get(key)!;
+  }
+}
+
+// Function to spawn coins at a specific cache location
+function spawnCoinsAtCache(lat: number, lng: number, count: number): Coin[] {
+  const coordinate = CoordinateFactory.getCoordinate(lat, lng);
+  const coins: Coin[] = [];
+
+  for (let serial = 0; serial < count; serial++) {
+      coins.push(new Coin(coordinate, serial));
+  }
+
+  return coins;
+}
+
+const oakesCollegeClassroomLat = 36.9916;
+const oakesCollegeClassroomLng = -122.0633;
+const coinsAtOakesCollege = spawnCoinsAtCache(oakesCollegeClassroomLat, oakesCollegeClassroomLng, 2);
+
+coinsAtOakesCollege.forEach(coin => {
+  console.log(coin.getUniqueID());
+});
+
+
 
 
