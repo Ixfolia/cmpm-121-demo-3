@@ -83,3 +83,42 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+/* Style for the collect button */
+#collect {
+  background-color: #4CAF50; /* Green */
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 16px;
+  margin: 4px 2px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+/* Style for the deposit button */
+#deposit {
+  background-color: #008CBA; /* Blue */
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 16px;
+  margin: 4px 2px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+/* Add hover effects */
+#collect:hover {
+  background-color: #45a049;
+}
+
+#deposit:hover {
+  background-color: #007bb5;
+}
