@@ -45,131 +45,349 @@ const playerMarker = leaflet.marker(playerLocation);
 playerMarker.bindTooltip("That's you!");
 playerMarker.addTo(map);
 
-// Display the player's points
+// Display the player's points and coins
 let playerPoints = 0;
 let playerCoins = 0;
 const statusPanel = document.querySelector<HTMLDivElement>("#statusPanel")!; // element `statusPanel` is defined in index.html
 statusPanel.innerHTML = "No points yet...";
 
-// Cache state storage
-const cacheState: { [key: string]: { pointValue: number; coinCount: number } } = {};
-
-// Convert latitude–longitude pairs into game cells
-function _latLngToCell(lat: number, lng: number) {
-  return {
-    i: Math.floor(lat / TILE_DEGREES),
-    j: Math.floor(lng / TILE_DEGREES),
-  };
+// Extend the Window interface to include custom functions
+declare global {
+  interface Window {
+    collectCoins: (coins: number) => void;
+    depositCoins: (coins: number) => void;
+  }
 }
 
+// Function to generate a random number of coins
+const generateCoins = () => Math.floor(Math.random() * 10) + 1;
+
+// Define the Coordinate type for the grid cell representation
+interface Coordinate {
+  i: number;
+  j: number;
+}
+
+// Coin interface represents each coin at a specific cache location
+interface Coin {
+  coordinate: Coordinate;
+  serial: number;
+  getUniqueID: () => string;
+}
+
+// Flyweight Factory for Coordinates
+const CoordinateFactory = (() => {
+  const coordinates: Map<string, Coordinate> = new Map();
+
+  return {
+    getCoordinate: (lat: number, lng: number): Coordinate => {
+      // Define the conversion to the global coordinate system
+      const cellSize = 0.0001; // Defines the size of each grid cell
+      const i = Math.floor(lat / cellSize);
+      const j = Math.floor(lng / cellSize);
+      const key = `${i}:${j}`;
+
+      // Use Flyweight pattern to ensure each coordinate is stored only once
+      if (!coordinates.has(key)) {
+        coordinates.set(key, { i, j });
+      }
+
+      return coordinates.get(key)!;
+    },
+  };
+})();
+
+// Function to spawn coins at a specific cache location
+const spawnCoinsAtCache = (lat: number, lng: number, count: number): Coin[] => {
+  const coordinate = CoordinateFactory.getCoordinate(lat, lng);
+  const coins: Coin[] = [];
+
+  for (let serial = 0; serial < count; serial++) {
+    coins.push({
+      coordinate,
+      serial,
+      getUniqueID: () => `${coordinate.i}:${coordinate.j}#${serial}`,
+    });
+  }
+
+  return coins;
+}
+
+// Memento pattern to save and restore cache states
+const CacheMemento = (() => {
+  const cacheStates: Map<string, { pointValue: number; coinCount: number }> = new Map();
+
+  return {
+    saveState: (key: string, state: { pointValue: number; coinCount: number }) => {
+      cacheStates.set(key, state);
+    },
+    getState: (key: string) => {
+      return cacheStates.get(key);
+    },
+    clearStates: () => {
+      cacheStates.clear();
+    },
+    get cacheStates() {
+      return cacheStates;
+    }
+  };
+})();
+
 // Add caches to the map by cell numbers
-function spawnCache(i: number, j: number) {
-  const cacheKey = `${i},${j}`;
-  const origin = leaflet.latLng(OAKES_CLASSROOM.lat + i * TILE_DEGREES, OAKES_CLASSROOM.lng + j * TILE_DEGREES);
-  const bounds = leaflet.latLngBounds([
-    [origin.lat, origin.lng],
-    [origin.lat + TILE_DEGREES, origin.lng + TILE_DEGREES],
-  ]);
-
-  console.log(`Cache bounds: ${bounds.toBBoxString()}`);
-
-  // Add a rectangle to the map to represent the cache
-  const rect = leaflet.rectangle(bounds, { color: "#ff7800", weight: 1, fillOpacity: 0.5 });
-  rect.addTo(map);
-  console.log(`Cache added to map at cell (${i}, ${j})`);
+const spawnCache = (lat: number, lng: number) => {
+  // Add a circle to the map to represent the cache
+  const circle = leaflet.circle([lat, lng], {
+    color: "#ff7800",
+    fillColor: "#ff7800",
+    fillOpacity: 0.5,
+    radius: 5, // Adjust the radius as needed
+  });
+  circle.addTo(map);
 
   // Handle interactions with the cache
-  rect.bindPopup(() => {
-    // Retrieve or initialize cache state
-    if (!cacheState[cacheKey]) {
-      cacheState[cacheKey] = {
-        pointValue: Math.floor(luck([i, j, "initialValue"].toString()) * 100),
-        coinCount: Math.floor(luck([i, j, "coinCount"].toString()) * 10),
-      };
-    }
-    const { pointValue, coinCount } = cacheState[cacheKey];
+  circle.bindPopup(() => {
+    const key = `${lat}:${lng}`;
+    let state = CacheMemento.getState(key);
 
-    // Generate unique coin identities
-    const _coins = Array.from({ length: coinCount }, (_, serial) => ({
-      i,
-      j,
-      serial,
-    }));
+    if (!state) {
+      state = {
+        pointValue: Math.floor(luck([lat, lng, "initialValue"].toString()) * 100),
+        coinCount: generateCoins(),
+      };
+      CacheMemento.saveState(key, state);
+    }
+
+    const { pointValue, coinCount } = state;
 
     // The popup offers a description and buttons
     const popupDiv = document.createElement("div");
     popupDiv.innerHTML = `
-                <div>There is a cache here at "${i},${j}". It has value <span id="value">${pointValue}</span> and <span id="coins">${coinCount}</span> coins.</div>
-                <button id="collect">Collect</button>
-                <button id="deposit">Deposit</button>`;
+                <div>There is a cache here at "${lat},${lng}". It has value <span id="value">${pointValue}</span> and <span id="coins">${coinCount}</span> coins.</div>
+                <button id="collect">Collect Coins</button>
+                <button id="deposit">Deposit Coins</button>`;
 
-    // Clicking the collect button decrements the cache's coin count and increments the player's coins and points
+    // Clicking the collect button increments the player's coins and decrements the cache's coins
     popupDiv
       .querySelector<HTMLButtonElement>("#collect")!
       .addEventListener("click", () => {
-        if (cacheState[cacheKey].coinCount > 0) {
-          cacheState[cacheKey].coinCount--;
-          playerCoins++;
-          playerPoints += pointValue;
+        if (coinCount > 0) {
+          playerCoins += coinCount;
+          state.coinCount = 0;
+          CacheMemento.saveState(key, state);
           popupDiv.querySelector<HTMLSpanElement>("#coins")!.innerHTML =
-            cacheState[cacheKey].coinCount.toString();
+            state.coinCount.toString();
           statusPanel.innerHTML = `${playerPoints} points accumulated, ${playerCoins} coins collected`;
         }
       });
 
-    // Clicking the deposit button increments the cache's coin count and decrements the player's coins
+    // Clicking the deposit button decrements the player's coins and increments the cache's coins
     popupDiv
       .querySelector<HTMLButtonElement>("#deposit")!
       .addEventListener("click", () => {
         if (playerCoins > 0) {
-          cacheState[cacheKey].coinCount++;
-          playerCoins--;
+          state.coinCount += playerCoins;
+          playerCoins = 0;
+          CacheMemento.saveState(key, state);
           popupDiv.querySelector<HTMLSpanElement>("#coins")!.innerHTML =
-            cacheState[cacheKey].coinCount.toString();
+            state.coinCount.toString();
           statusPanel.innerHTML = `${playerPoints} points accumulated, ${playerCoins} coins collected`;
         }
       });
+
+    // Add event listener to coin identifier to center the map on the cache location
+    popupDiv.querySelector<HTMLSpanElement>("#coins")!.addEventListener("click", () => {
+      map.setView([lat, lng], GAMEPLAY_ZOOM_LEVEL);
+    });
 
     return popupDiv;
   });
 }
 
-// Function to update caches around the player's location
-function updateCaches() {
-  console.log("Updating caches...");
+// Function to update the map with caches around the player's location
+const updateCaches = () => {
   map.eachLayer((layer) => {
-    if (layer instanceof leaflet.Rectangle) {
+    if (layer instanceof leaflet.Circle) {
       map.removeLayer(layer);
     }
   });
 
-  const playerCell = _latLngToCell(playerLocation.lat, playerLocation.lng);
-  console.log(`Player cell: ${playerCell.i}, ${playerCell.j}`);
-  for (let i = playerCell.i - NEIGHBORHOOD_SIZE; i <= playerCell.i + NEIGHBORHOOD_SIZE; i++) {
-    for (let j = playerCell.j - NEIGHBORHOOD_SIZE; j <= playerCell.j + NEIGHBORHOOD_SIZE; j++) {
-      const luckValue = luck([i, j].toString());
-      console.log(`Luck value for cell (${i}, ${j}): ${luckValue}`);
-      if (luckValue < CACHE_SPAWN_PROBABILITY) {
-        console.log(`Spawning cache at cell (${i}, ${j})`);
-        spawnCache(i, j);
+  const playerLat = playerLocation.lat;
+  const playerLng = playerLocation.lng;
+
+  for (let i = -NEIGHBORHOOD_SIZE; i < NEIGHBORHOOD_SIZE; i++) {
+    for (let j = -NEIGHBORHOOD_SIZE; j < NEIGHBORHOOD_SIZE; j++) {
+      const lat = playerLat + i * TILE_DEGREES;
+      const lng = playerLng + j * TILE_DEGREES;
+      // If location i,j is lucky enough, spawn a cache!
+      if (luck([lat, lng].toString()) < CACHE_SPAWN_PROBABILITY) {
+        spawnCache(lat, lng);
       }
     }
   }
 }
 
-// Function to move the player
-function movePlayer(latOffset: number, lngOffset: number) {
-  playerLocation = leaflet.latLng(playerLocation.lat + latOffset, playerLocation.lng + lngOffset);
+// Declare movementHistory and movementPolyline before using them
+let movementHistory: leaflet.LatLng[] = [];
+let movementPolyline: leaflet.Polyline | null = null;
+
+// Event listeners for movement buttons
+document.getElementById("north")!.addEventListener("click", () => {
+  playerLocation = leaflet.latLng(playerLocation.lat + TILE_DEGREES, playerLocation.lng);
   playerMarker.setLatLng(playerLocation);
   map.setView(playerLocation);
+  movementHistory.push(playerLocation);
+  if (movementPolyline) {
+    movementPolyline.setLatLngs(movementHistory);
+  } else {
+    movementPolyline = leaflet.polyline(movementHistory, { color: 'blue' }).addTo(map);
+  }
   updateCaches();
-}
+  saveState();
+});
 
-// Add event listeners to the movement buttons
-document.getElementById("north")!.addEventListener("click", () => movePlayer(TILE_DEGREES, 0));
-document.getElementById("south")!.addEventListener("click", () => movePlayer(-TILE_DEGREES, 0));
-document.getElementById("west")!.addEventListener("click", () => movePlayer(0, -TILE_DEGREES));
-document.getElementById("east")!.addEventListener("click", () => movePlayer(0, TILE_DEGREES));
+document.getElementById("south")!.addEventListener("click", () => {
+  playerLocation = leaflet.latLng(playerLocation.lat - TILE_DEGREES, playerLocation.lng);
+  playerMarker.setLatLng(playerLocation);
+  map.setView(playerLocation);
+  movementHistory.push(playerLocation);
+  if (movementPolyline) {
+    movementPolyline.setLatLngs(movementHistory);
+  } else {
+    movementPolyline = leaflet.polyline(movementHistory, { color: 'blue' }).addTo(map);
+  }
+  updateCaches();
+  saveState();
+});
+
+document.getElementById("west")!.addEventListener("click", () => {
+  playerLocation = leaflet.latLng(playerLocation.lat, playerLocation.lng - TILE_DEGREES);
+  playerMarker.setLatLng(playerLocation);
+  map.setView(playerLocation);
+  movementHistory.push(playerLocation);
+  if (movementPolyline) {
+    movementPolyline.setLatLngs(movementHistory);
+  } else {
+    movementPolyline = leaflet.polyline(movementHistory, { color: 'blue' }).addTo(map);
+  }
+  updateCaches();
+  saveState();
+});
+
+document.getElementById("east")!.addEventListener("click", () => {
+  playerLocation = leaflet.latLng(playerLocation.lat, playerLocation.lng + TILE_DEGREES);
+  playerMarker.setLatLng(playerLocation);
+  map.setView(playerLocation);
+  movementHistory.push(playerLocation);
+  if (movementPolyline) {
+    movementPolyline.setLatLngs(movementHistory);
+  } else {
+    movementPolyline = leaflet.polyline(movementHistory, { color: 'blue' }).addTo(map);
+  }
+  updateCaches();
+  saveState();
+});
 
 // Initial cache generation
 updateCaches();
+
+const saveState = () => {
+  const state = {
+    playerLocation,
+    playerPoints,
+    playerCoins,
+    cacheStates: Array.from(CacheMemento.cacheStates.entries()),
+    movementHistory,
+  };
+  localStorage.setItem("gameState", JSON.stringify(state));
+};
+
+const loadState = () => {
+  const state = localStorage.getItem("gameState");
+  if (state) {
+    const { playerLocation: loc, playerPoints: points, playerCoins: coins, cacheStates, movementHistory: history } = JSON.parse(state);
+    playerLocation = leaflet.latLng(loc.lat, loc.lng);
+    playerPoints = points;
+    playerCoins = coins;
+
+    // Clear existing cache states and add the new ones
+    CacheMemento.clearStates();
+    if (cacheStates) {
+      cacheStates.forEach(([key, value]: [string, { pointValue: number; coinCount: number }]) => {
+        CacheMemento.saveState(key, value);
+      });
+    }
+
+    movementHistory = history.map((latlng: { lat: number; lng: number }) => leaflet.latLng(latlng.lat, latlng.lng));
+
+    playerMarker.setLatLng(playerLocation);
+    map.setView(playerLocation);
+    statusPanel.innerHTML = `${playerPoints} points accumulated, ${playerCoins} coins collected`;
+
+    if (movementPolyline) {
+      movementPolyline.setLatLngs(movementHistory);
+    } else {
+      movementPolyline = leaflet.polyline(movementHistory, { color: 'blue' }).addTo(map);
+    }
+  }
+};
+
+// Load state on page load
+loadState();
+
+let watchId: number | null = null;
+
+document.getElementById("sensor")!.addEventListener("click", () => {
+  if (watchId === null) {
+    watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        playerLocation = leaflet.latLng(latitude, longitude);
+        playerMarker.setLatLng(playerLocation);
+        map.setView(playerLocation);
+
+        // Update movement history
+        movementHistory.push(playerLocation);
+        if (movementPolyline) {
+          movementPolyline.setLatLngs(movementHistory);
+        } else {
+          movementPolyline = leaflet.polyline(movementHistory, { color: 'blue' }).addTo(map);
+        }
+
+        // Update caches around the new location
+        updateCaches();
+
+        // Save state to localStorage
+        saveState();
+      },
+      (error) => {
+        console.error("Geolocation error:", error);
+      },
+      { enableHighAccuracy: true }
+    );
+  } else {
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+  }
+});
+
+document.getElementById("reset")!.addEventListener("click", () => {
+  const confirmation = prompt("Are you sure you want to erase your game state? Type 'yes' to confirm.");
+  if (confirmation === 'yes') {
+    // Reset player state
+    playerPoints = 0;
+    playerCoins = 0;
+    movementHistory = [];
+    if (movementPolyline) {
+      map.removeLayer(movementPolyline);
+      movementPolyline = null;
+    }
+    statusPanel.innerHTML = "No points yet...";
+
+    // Reset cache states and return coins to home caches
+    CacheMemento.clearStates();
+    updateCaches();
+
+    // Save state to localStorage
+    saveState();
+  }
+});
