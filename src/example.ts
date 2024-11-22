@@ -46,16 +46,25 @@ playerMarker.addTo(map);
 
 // Display the player's points
 let playerPoints = 0;
+let playerCoins = 0;
 const statusPanel = document.querySelector<HTMLDivElement>("#statusPanel")!; // element `statusPanel` is defined in index.html
 statusPanel.innerHTML = "No points yet...";
+
+// Convert latitude–longitude pairs into game cells
+function _latLngToCell(lat: number, lng: number) {
+  return {
+    i: Math.floor(lat / TILE_DEGREES),
+    j: Math.floor(lng / TILE_DEGREES),
+  };
+}
 
 // Add caches to the map by cell numbers
 function spawnCache(i: number, j: number) {
   // Convert cell numbers into lat/lng bounds
-  const origin = OAKES_CLASSROOM;
+  const origin = leaflet.latLng(i * TILE_DEGREES, j * TILE_DEGREES);
   const bounds = leaflet.latLngBounds([
-    [origin.lat + i * TILE_DEGREES, origin.lng + j * TILE_DEGREES],
-    [origin.lat + (i + 1) * TILE_DEGREES, origin.lng + (j + 1) * TILE_DEGREES],
+    [origin.lat, origin.lng],
+    [origin.lat + TILE_DEGREES, origin.lng + TILE_DEGREES],
   ]);
 
   // Add a rectangle to the map to represent the cache
@@ -64,24 +73,49 @@ function spawnCache(i: number, j: number) {
 
   // Handle interactions with the cache
   rect.bindPopup(() => {
-    // Each cache has a random point value, mutable by the player
+    // Each cache has a random point value and coin count, mutable by the player
     let pointValue = Math.floor(luck([i, j, "initialValue"].toString()) * 100);
+    let coinCount = Math.floor(luck([i, j, "coinCount"].toString()) * 10);
 
-    // The popup offers a description and button
+    // Generate unique coin identities
+    const coins = Array.from({ length: coinCount }, (_, serial) => ({
+      i,
+      j,
+      serial,
+    }));
+
+    // The popup offers a description and buttons
     const popupDiv = document.createElement("div");
     popupDiv.innerHTML = `
-                <div>There is a cache here at "${i},${j}". It has value <span id="value">${pointValue}</span>.</div>
-                <button id="poke">poke</button>`;
+                <div>There is a cache here at "${i},${j}". It has value <span id="value">${pointValue}</span> and <span id="coins">${coinCount}</span> coins.</div>
+                <button id="collect">Collect</button>
+                <button id="deposit">Deposit</button>`;
 
-    // Clicking the button decrements the cache's value and increments the player's points
+    // Clicking the collect button decrements the cache's coin count and increments the player's coins and points
     popupDiv
-      .querySelector<HTMLButtonElement>("#poke")!
+      .querySelector<HTMLButtonElement>("#collect")!
       .addEventListener("click", () => {
-        pointValue--;
-        popupDiv.querySelector<HTMLSpanElement>("#value")!.innerHTML =
-          pointValue.toString();
-        playerPoints++;
-        statusPanel.innerHTML = `${playerPoints} points accumulated`;
+        if (coinCount > 0) {
+          coinCount--;
+          playerCoins++;
+          playerPoints += pointValue;
+          popupDiv.querySelector<HTMLSpanElement>("#coins")!.innerHTML =
+            coinCount.toString();
+          statusPanel.innerHTML = `${playerPoints} points accumulated, ${playerCoins} coins collected`;
+        }
+      });
+
+    // Clicking the deposit button increments the cache's coin count and decrements the player's coins
+    popupDiv
+      .querySelector<HTMLButtonElement>("#deposit")!
+      .addEventListener("click", () => {
+        if (playerCoins > 0) {
+          coinCount++;
+          playerCoins--;
+          popupDiv.querySelector<HTMLSpanElement>("#coins")!.innerHTML =
+            coinCount.toString();
+          statusPanel.innerHTML = `${playerPoints} points accumulated, ${playerCoins} coins collected`;
+        }
       });
 
     return popupDiv;
@@ -91,8 +125,11 @@ function spawnCache(i: number, j: number) {
 // Look around the player's neighborhood for caches to spawn
 for (let i = -NEIGHBORHOOD_SIZE; i < NEIGHBORHOOD_SIZE; i++) {
   for (let j = -NEIGHBORHOOD_SIZE; j < NEIGHBORHOOD_SIZE; j++) {
+    const luckValue = luck([i, j].toString());
+    console.log(`Luck value for cell (${i}, ${j}): ${luckValue}`);
     // If location i,j is lucky enough, spawn a cache!
-    if (luck([i, j].toString()) < CACHE_SPAWN_PROBABILITY) {
+    if (luckValue < CACHE_SPAWN_PROBABILITY) {
+      console.log(`Spawning cache at cell (${i}, ${j})`);
       spawnCache(i, j);
     }
   }
