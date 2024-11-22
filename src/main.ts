@@ -40,7 +40,8 @@ leaflet
   .addTo(map);
 
 // Add a marker to represent the player
-const playerMarker = leaflet.marker(OAKES_CLASSROOM);
+let playerLocation = OAKES_CLASSROOM;
+const playerMarker = leaflet.marker(playerLocation);
 playerMarker.bindTooltip("That's you!");
 playerMarker.addTo(map);
 
@@ -49,6 +50,9 @@ let playerPoints = 0;
 let playerCoins = 0;
 const statusPanel = document.querySelector<HTMLDivElement>("#statusPanel")!; // element `statusPanel` is defined in index.html
 statusPanel.innerHTML = "No points yet...";
+
+// Cache state storage
+const cacheState: { [key: string]: { pointValue: number; coinCount: number } } = {};
 
 // Convert latitude–longitude pairs into game cells
 function _latLngToCell(lat: number, lng: number) {
@@ -60,7 +64,7 @@ function _latLngToCell(lat: number, lng: number) {
 
 // Add caches to the map by cell numbers
 function spawnCache(i: number, j: number) {
-  // Convert cell numbers into lat/lng bounds
+  const cacheKey = `${i},${j}`;
   const origin = leaflet.latLng(OAKES_CLASSROOM.lat + i * TILE_DEGREES, OAKES_CLASSROOM.lng + j * TILE_DEGREES);
   const bounds = leaflet.latLngBounds([
     [origin.lat, origin.lng],
@@ -70,18 +74,23 @@ function spawnCache(i: number, j: number) {
   console.log(`Cache bounds: ${bounds.toBBoxString()}`);
 
   // Add a rectangle to the map to represent the cache
-  const rect = leaflet.rectangle(bounds, { color: "#ff7800", weight: 1 });
+  const rect = leaflet.rectangle(bounds, { color: "#ff7800", weight: 1, fillOpacity: 0.5 });
   rect.addTo(map);
   console.log(`Cache added to map at cell (${i}, ${j})`);
 
   // Handle interactions with the cache
   rect.bindPopup(() => {
-    // Each cache has a random point value and coin count, mutable by the player
-    let pointValue = Math.floor(luck([i, j, "initialValue"].toString()) * 100);
-    let coinCount = Math.floor(luck([i, j, "coinCount"].toString()) * 10);
+    // Retrieve or initialize cache state
+    if (!cacheState[cacheKey]) {
+      cacheState[cacheKey] = {
+        pointValue: Math.floor(luck([i, j, "initialValue"].toString()) * 100),
+        coinCount: Math.floor(luck([i, j, "coinCount"].toString()) * 10),
+      };
+    }
+    const { pointValue, coinCount } = cacheState[cacheKey];
 
     // Generate unique coin identities
-    const coins = Array.from({ length: coinCount }, (_, serial) => ({
+    const _coins = Array.from({ length: coinCount }, (_, serial) => ({
       i,
       j,
       serial,
@@ -98,12 +107,12 @@ function spawnCache(i: number, j: number) {
     popupDiv
       .querySelector<HTMLButtonElement>("#collect")!
       .addEventListener("click", () => {
-        if (coinCount > 0) {
-          coinCount--;
+        if (cacheState[cacheKey].coinCount > 0) {
+          cacheState[cacheKey].coinCount--;
           playerCoins++;
           playerPoints += pointValue;
           popupDiv.querySelector<HTMLSpanElement>("#coins")!.innerHTML =
-            coinCount.toString();
+            cacheState[cacheKey].coinCount.toString();
           statusPanel.innerHTML = `${playerPoints} points accumulated, ${playerCoins} coins collected`;
         }
       });
@@ -113,10 +122,10 @@ function spawnCache(i: number, j: number) {
       .querySelector<HTMLButtonElement>("#deposit")!
       .addEventListener("click", () => {
         if (playerCoins > 0) {
-          coinCount++;
+          cacheState[cacheKey].coinCount++;
           playerCoins--;
           popupDiv.querySelector<HTMLSpanElement>("#coins")!.innerHTML =
-            coinCount.toString();
+            cacheState[cacheKey].coinCount.toString();
           statusPanel.innerHTML = `${playerPoints} points accumulated, ${playerCoins} coins collected`;
         }
       });
@@ -125,15 +134,42 @@ function spawnCache(i: number, j: number) {
   });
 }
 
-// Look around the player's neighborhood for caches to spawn
-for (let i = -NEIGHBORHOOD_SIZE; i < NEIGHBORHOOD_SIZE; i++) {
-  for (let j = -NEIGHBORHOOD_SIZE; j < NEIGHBORHOOD_SIZE; j++) {
-    const luckValue = luck([i, j].toString());
-    console.log(`Luck value for cell (${i}, ${j}): ${luckValue}`);
-    // If location i,j is lucky enough, spawn a cache!
-    if (luckValue < CACHE_SPAWN_PROBABILITY) {
-      console.log(`Spawning cache at cell (${i}, ${j})`);
-      spawnCache(i, j);
+// Function to update caches around the player's location
+function updateCaches() {
+  console.log("Updating caches...");
+  map.eachLayer((layer) => {
+    if (layer instanceof leaflet.Rectangle) {
+      map.removeLayer(layer);
+    }
+  });
+
+  const playerCell = _latLngToCell(playerLocation.lat, playerLocation.lng);
+  console.log(`Player cell: ${playerCell.i}, ${playerCell.j}`);
+  for (let i = playerCell.i - NEIGHBORHOOD_SIZE; i <= playerCell.i + NEIGHBORHOOD_SIZE; i++) {
+    for (let j = playerCell.j - NEIGHBORHOOD_SIZE; j <= playerCell.j + NEIGHBORHOOD_SIZE; j++) {
+      const luckValue = luck([i, j].toString());
+      console.log(`Luck value for cell (${i}, ${j}): ${luckValue}`);
+      if (luckValue < CACHE_SPAWN_PROBABILITY) {
+        console.log(`Spawning cache at cell (${i}, ${j})`);
+        spawnCache(i, j);
+      }
     }
   }
 }
+
+// Function to move the player
+function movePlayer(latOffset: number, lngOffset: number) {
+  playerLocation = leaflet.latLng(playerLocation.lat + latOffset, playerLocation.lng + lngOffset);
+  playerMarker.setLatLng(playerLocation);
+  map.setView(playerLocation);
+  updateCaches();
+}
+
+// Add event listeners to the movement buttons
+document.getElementById("north")!.addEventListener("click", () => movePlayer(TILE_DEGREES, 0));
+document.getElementById("south")!.addEventListener("click", () => movePlayer(-TILE_DEGREES, 0));
+document.getElementById("west")!.addEventListener("click", () => movePlayer(0, -TILE_DEGREES));
+document.getElementById("east")!.addEventListener("click", () => movePlayer(0, TILE_DEGREES));
+
+// Initial cache generation
+updateCaches();
