@@ -111,14 +111,18 @@ const spawnCoinsAtCache = (lat: number, lng: number, count: number): Coin[] => {
   }
 
   return coins;
-}
+};
 
 // Memento pattern to save and restore cache states
 const CacheMemento = (() => {
-  const cacheStates: Map<string, { pointValue: number; coinCount: number }> = new Map();
+  const cacheStates: Map<string, { pointValue: number; coinCount: number }> =
+    new Map();
 
   return {
-    saveState: (key: string, state: { pointValue: number; coinCount: number }) => {
+    saveState: (
+      key: string,
+      state: { pointValue: number; coinCount: number },
+    ) => {
       cacheStates.set(key, state);
     },
     getState: (key: string) => {
@@ -129,7 +133,7 @@ const CacheMemento = (() => {
     },
     get cacheStates() {
       return cacheStates;
-    }
+    },
   };
 })();
 
@@ -151,7 +155,9 @@ const spawnCache = (lat: number, lng: number) => {
 
     if (!state) {
       state = {
-        pointValue: Math.floor(luck([lat, lng, "initialValue"].toString()) * 100),
+        pointValue: Math.floor(
+          luck([lat, lng, "initialValue"].toString()) * 100,
+        ),
         coinCount: generateCoins(),
       };
       CacheMemento.saveState(key, state);
@@ -174,9 +180,10 @@ const spawnCache = (lat: number, lng: number) => {
           playerCoins += coinCount;
           state.coinCount = 0;
           CacheMemento.saveState(key, state);
-          popupDiv.querySelector<HTMLSpanElement>("#coins")!.innerHTML =
-            state.coinCount.toString();
-          statusPanel.innerHTML = `${playerPoints} points accumulated, ${playerCoins} coins collected`;
+          popupDiv.querySelector<HTMLSpanElement>("#coins")!.innerHTML = state
+            .coinCount.toString();
+          statusPanel.innerHTML =
+            `${playerPoints} points accumulated, ${playerCoins} coins collected`;
         }
       });
 
@@ -188,20 +195,24 @@ const spawnCache = (lat: number, lng: number) => {
           state.coinCount += playerCoins;
           playerCoins = 0;
           CacheMemento.saveState(key, state);
-          popupDiv.querySelector<HTMLSpanElement>("#coins")!.innerHTML =
-            state.coinCount.toString();
-          statusPanel.innerHTML = `${playerPoints} points accumulated, ${playerCoins} coins collected`;
+          popupDiv.querySelector<HTMLSpanElement>("#coins")!.innerHTML = state
+            .coinCount.toString();
+          statusPanel.innerHTML =
+            `${playerPoints} points accumulated, ${playerCoins} coins collected`;
         }
       });
 
     // Add event listener to coin identifier to center the map on the cache location
-    popupDiv.querySelector<HTMLSpanElement>("#coins")!.addEventListener("click", () => {
-      map.setView([lat, lng], GAMEPLAY_ZOOM_LEVEL);
-    });
+    popupDiv.querySelector<HTMLSpanElement>("#coins")!.addEventListener(
+      "click",
+      () => {
+        map.setView([lat, lng], GAMEPLAY_ZOOM_LEVEL);
+      },
+    );
 
     return popupDiv;
   });
-}
+};
 
 // Function to update the map with caches around the player's location
 const updateCaches = () => {
@@ -224,7 +235,7 @@ const updateCaches = () => {
       }
     }
   }
-}
+};
 
 // Declare movementHistory and movementPolyline before using them
 let movementHistory: leaflet.LatLng[] = [];
@@ -232,56 +243,72 @@ let movementPolyline: leaflet.Polyline | null = null;
 
 // Event listeners for movement buttons
 document.getElementById("north")!.addEventListener("click", () => {
-  playerLocation = leaflet.latLng(playerLocation.lat + TILE_DEGREES, playerLocation.lng);
+  playerLocation = leaflet.latLng(
+    playerLocation.lat + TILE_DEGREES,
+    playerLocation.lng,
+  );
   playerMarker.setLatLng(playerLocation);
   map.setView(playerLocation);
   movementHistory.push(playerLocation);
   if (movementPolyline) {
     movementPolyline.setLatLngs(movementHistory);
   } else {
-    movementPolyline = leaflet.polyline(movementHistory, { color: 'blue' }).addTo(map);
+    movementPolyline = leaflet.polyline(movementHistory, { color: "blue" })
+      .addTo(map);
   }
   updateCaches();
   saveState();
 });
 
 document.getElementById("south")!.addEventListener("click", () => {
-  playerLocation = leaflet.latLng(playerLocation.lat - TILE_DEGREES, playerLocation.lng);
+  playerLocation = leaflet.latLng(
+    playerLocation.lat - TILE_DEGREES,
+    playerLocation.lng,
+  );
   playerMarker.setLatLng(playerLocation);
   map.setView(playerLocation);
   movementHistory.push(playerLocation);
   if (movementPolyline) {
     movementPolyline.setLatLngs(movementHistory);
   } else {
-    movementPolyline = leaflet.polyline(movementHistory, { color: 'blue' }).addTo(map);
+    movementPolyline = leaflet.polyline(movementHistory, { color: "blue" })
+      .addTo(map);
   }
   updateCaches();
   saveState();
 });
 
 document.getElementById("west")!.addEventListener("click", () => {
-  playerLocation = leaflet.latLng(playerLocation.lat, playerLocation.lng - TILE_DEGREES);
+  playerLocation = leaflet.latLng(
+    playerLocation.lat,
+    playerLocation.lng - TILE_DEGREES,
+  );
   playerMarker.setLatLng(playerLocation);
   map.setView(playerLocation);
   movementHistory.push(playerLocation);
   if (movementPolyline) {
     movementPolyline.setLatLngs(movementHistory);
   } else {
-    movementPolyline = leaflet.polyline(movementHistory, { color: 'blue' }).addTo(map);
+    movementPolyline = leaflet.polyline(movementHistory, { color: "blue" })
+      .addTo(map);
   }
   updateCaches();
   saveState();
 });
 
 document.getElementById("east")!.addEventListener("click", () => {
-  playerLocation = leaflet.latLng(playerLocation.lat, playerLocation.lng + TILE_DEGREES);
+  playerLocation = leaflet.latLng(
+    playerLocation.lat,
+    playerLocation.lng + TILE_DEGREES,
+  );
   playerMarker.setLatLng(playerLocation);
   map.setView(playerLocation);
   movementHistory.push(playerLocation);
   if (movementPolyline) {
     movementPolyline.setLatLngs(movementHistory);
   } else {
-    movementPolyline = leaflet.polyline(movementHistory, { color: 'blue' }).addTo(map);
+    movementPolyline = leaflet.polyline(movementHistory, { color: "blue" })
+      .addTo(map);
   }
   updateCaches();
   saveState();
@@ -304,7 +331,13 @@ const saveState = () => {
 const loadState = () => {
   const state = localStorage.getItem("gameState");
   if (state) {
-    const { playerLocation: loc, playerPoints: points, playerCoins: coins, cacheStates, movementHistory: history } = JSON.parse(state);
+    const {
+      playerLocation: loc,
+      playerPoints: points,
+      playerCoins: coins,
+      cacheStates,
+      movementHistory: history,
+    } = JSON.parse(state);
     playerLocation = leaflet.latLng(loc.lat, loc.lng);
     playerPoints = points;
     playerCoins = coins;
@@ -312,21 +345,27 @@ const loadState = () => {
     // Clear existing cache states and add the new ones
     CacheMemento.clearStates();
     if (cacheStates) {
-      cacheStates.forEach(([key, value]: [string, { pointValue: number; coinCount: number }]) => {
-        CacheMemento.saveState(key, value);
-      });
+      cacheStates.forEach(
+        ([key, value]: [string, { pointValue: number; coinCount: number }]) => {
+          CacheMemento.saveState(key, value);
+        },
+      );
     }
 
-    movementHistory = history.map((latlng: { lat: number; lng: number }) => leaflet.latLng(latlng.lat, latlng.lng));
+    movementHistory = history.map((latlng: { lat: number; lng: number }) =>
+      leaflet.latLng(latlng.lat, latlng.lng)
+    );
 
     playerMarker.setLatLng(playerLocation);
     map.setView(playerLocation);
-    statusPanel.innerHTML = `${playerPoints} points accumulated, ${playerCoins} coins collected`;
+    statusPanel.innerHTML =
+      `${playerPoints} points accumulated, ${playerCoins} coins collected`;
 
     if (movementPolyline) {
       movementPolyline.setLatLngs(movementHistory);
     } else {
-      movementPolyline = leaflet.polyline(movementHistory, { color: 'blue' }).addTo(map);
+      movementPolyline = leaflet.polyline(movementHistory, { color: "blue" })
+        .addTo(map);
     }
   }
 };
@@ -350,7 +389,9 @@ document.getElementById("sensor")!.addEventListener("click", () => {
         if (movementPolyline) {
           movementPolyline.setLatLngs(movementHistory);
         } else {
-          movementPolyline = leaflet.polyline(movementHistory, { color: 'blue' }).addTo(map);
+          movementPolyline = leaflet.polyline(movementHistory, {
+            color: "blue",
+          }).addTo(map);
         }
 
         // Update caches around the new location
@@ -362,7 +403,7 @@ document.getElementById("sensor")!.addEventListener("click", () => {
       (error) => {
         console.error("Geolocation error:", error);
       },
-      { enableHighAccuracy: true }
+      { enableHighAccuracy: true },
     );
   } else {
     navigator.geolocation.clearWatch(watchId);
@@ -371,8 +412,10 @@ document.getElementById("sensor")!.addEventListener("click", () => {
 });
 
 document.getElementById("reset")!.addEventListener("click", () => {
-  const confirmation = prompt("Are you sure you want to erase your game state? Type 'yes' to confirm.");
-  if (confirmation === 'yes') {
+  const confirmation = prompt(
+    "Are you sure you want to erase your game state? Type 'yes' to confirm.",
+  );
+  if (confirmation === "yes") {
     // Reset player state
     playerPoints = 0;
     playerCoins = 0;
