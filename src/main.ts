@@ -11,8 +11,12 @@ import "./leafletWorkaround.ts";
 // Deterministic random number generator
 import luck from "./luck.ts";
 
+import { PlayerState } from "./PlayerState.ts";
+
 // Location of our classroom (as identified on Google Maps)
 const OAKES_CLASSROOM = leaflet.latLng(36.98949379578401, -122.06277128548504);
+const initialLocation = OAKES_CLASSROOM;
+
 
 // Tunable gameplay parameters
 const GAMEPLAY_ZOOM_LEVEL = 19;
@@ -29,6 +33,9 @@ const map = leaflet.map(document.getElementById("map")!, {
   zoomControl: false,
   scrollWheelZoom: false,
 });
+
+// Create a player state object
+const playerState = new PlayerState(initialLocation, map);
 
 // Populate the map with a background tile layer
 leaflet
@@ -243,12 +250,9 @@ let movementPolyline: leaflet.Polyline | null = null;
 
 // Event listeners for movement buttons
 document.getElementById("north")!.addEventListener("click", () => {
-  playerLocation = leaflet.latLng(
-    playerLocation.lat + TILE_DEGREES,
-    playerLocation.lng,
-  );
-  playerMarker.setLatLng(playerLocation);
-  map.setView(playerLocation);
+  const currentLocation = playerState.getLocation();
+  const newLocation = leaflet.latLng(currentLocation.lat + TILE_DEGREES, currentLocation.lng);
+  playerState.setLocation(newLocation);
   movementHistory.push(playerLocation);
   if (movementPolyline) {
     movementPolyline.setLatLngs(movementHistory);
@@ -261,12 +265,9 @@ document.getElementById("north")!.addEventListener("click", () => {
 });
 
 document.getElementById("south")!.addEventListener("click", () => {
-  playerLocation = leaflet.latLng(
-    playerLocation.lat - TILE_DEGREES,
-    playerLocation.lng,
-  );
-  playerMarker.setLatLng(playerLocation);
-  map.setView(playerLocation);
+  const currentLocation = playerState.getLocation();
+  const newLocation = leaflet.latLng(currentLocation.lat + TILE_DEGREES, currentLocation.lng);
+  playerState.setLocation(newLocation);
   movementHistory.push(playerLocation);
   if (movementPolyline) {
     movementPolyline.setLatLngs(movementHistory);
@@ -279,12 +280,9 @@ document.getElementById("south")!.addEventListener("click", () => {
 });
 
 document.getElementById("west")!.addEventListener("click", () => {
-  playerLocation = leaflet.latLng(
-    playerLocation.lat,
-    playerLocation.lng - TILE_DEGREES,
-  );
-  playerMarker.setLatLng(playerLocation);
-  map.setView(playerLocation);
+  const currentLocation = playerState.getLocation();
+  const newLocation = leaflet.latLng(currentLocation.lat + TILE_DEGREES, currentLocation.lng);
+  playerState.setLocation(newLocation);
   movementHistory.push(playerLocation);
   if (movementPolyline) {
     movementPolyline.setLatLngs(movementHistory);
@@ -297,12 +295,9 @@ document.getElementById("west")!.addEventListener("click", () => {
 });
 
 document.getElementById("east")!.addEventListener("click", () => {
-  playerLocation = leaflet.latLng(
-    playerLocation.lat,
-    playerLocation.lng + TILE_DEGREES,
-  );
-  playerMarker.setLatLng(playerLocation);
-  map.setView(playerLocation);
+  const currentLocation = playerState.getLocation();
+  const newLocation = leaflet.latLng(currentLocation.lat + TILE_DEGREES, currentLocation.lng);
+  playerState.setLocation(newLocation);
   movementHistory.push(playerLocation);
   if (movementPolyline) {
     movementPolyline.setLatLngs(movementHistory);
@@ -356,8 +351,8 @@ const loadState = () => {
       leaflet.latLng(latlng.lat, latlng.lng)
     );
 
-    playerMarker.setLatLng(playerLocation);
-    map.setView(playerLocation);
+    playerState.setLocation(playerLocation); // Updates both the marker and the internal state
+    playerState.setLocation(playerLocation); // Automatically updates `map.setView` internally
     statusPanel.innerHTML =
       `${playerPoints} points accumulated, ${playerCoins} coins collected`;
 
@@ -381,8 +376,8 @@ document.getElementById("sensor")!.addEventListener("click", () => {
       (position) => {
         const { latitude, longitude } = position.coords;
         playerLocation = leaflet.latLng(latitude, longitude);
-        playerMarker.setLatLng(playerLocation);
-        map.setView(playerLocation);
+        playerState.setLocation(playerLocation); // Updates both the marker and the internal state
+        playerState.setLocation(playerLocation); // Automatically updates `map.setView` internally
 
         // Update movement history
         movementHistory.push(playerLocation);
