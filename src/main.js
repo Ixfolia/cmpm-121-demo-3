@@ -10,8 +10,12 @@ import "./leafletWorkaround.js";
 // Deterministic random number generator
 import luck from "./luck.js";
 
+// Import PlayerState class
+import { PlayerState } from "./PlayerState.js";
+
 // Location of our classroom (as identified on Google Maps)
 const OAKES_CLASSROOM = leaflet.latLng(36.98949379578401, -122.06277128548504);
+const initialLocation = OAKES_CLASSROOM;
 
 // Tunable gameplay parameters
 const GAMEPLAY_ZOOM_LEVEL = 19;
@@ -29,6 +33,9 @@ const map = leaflet.map(document.getElementById("map"), {
   scrollWheelZoom: false,
 });
 
+// Create a player state object
+const playerState = new PlayerState(initialLocation, map);
+
 // Populate the map with a background tile layer
 leaflet
   .tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -37,12 +44,6 @@ leaflet
       '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
   })
   .addTo(map);
-
-// Add a marker to represent the player
-let playerLocation = OAKES_CLASSROOM;
-const playerMarker = leaflet.marker(playerLocation);
-playerMarker.bindTooltip("That's you!");
-playerMarker.addTo(map);
 
 // Display the player's points and coins
 let playerPoints = 0;
@@ -205,8 +206,7 @@ const updateCaches = () => {
     }
   });
 
-  const playerLat = playerLocation.lat;
-  const playerLng = playerLocation.lng;
+  const { lat: playerLat, lng: playerLng } = playerState.getLocation(); // Fetch player location
 
   for (let i = -NEIGHBORHOOD_SIZE; i < NEIGHBORHOOD_SIZE; i++) {
     for (let j = -NEIGHBORHOOD_SIZE; j < NEIGHBORHOOD_SIZE; j++) {
@@ -226,56 +226,60 @@ let movementPolyline = null;
 
 // Event listeners for movement buttons
 document.getElementById("north").addEventListener("click", () => {
-  playerLocation = leaflet.latLng(playerLocation.lat + TILE_DEGREES, playerLocation.lng);
-  playerMarker.setLatLng(playerLocation);
-  map.setView(playerLocation);
-  movementHistory.push(playerLocation);
+  const currentLocation = playerState.getLocation();
+  const newLocation = leaflet.latLng(currentLocation.lat + TILE_DEGREES, currentLocation.lng);
+  playerState.setLocation(newLocation);
+  movementHistory.push(playerState.getLocation());
   if (movementPolyline) {
     movementPolyline.setLatLngs(movementHistory);
   } else {
-    movementPolyline = leaflet.polyline(movementHistory, { color: 'blue' }).addTo(map);
+    movementPolyline = leaflet.polyline(movementHistory, { color: "blue" })
+      .addTo(map);
   }
   updateCaches();
   saveState();
 });
 
 document.getElementById("south").addEventListener("click", () => {
-  playerLocation = leaflet.latLng(playerLocation.lat - TILE_DEGREES, playerLocation.lng);
-  playerMarker.setLatLng(playerLocation);
-  map.setView(playerLocation);
-  movementHistory.push(playerLocation);
+  const currentLocation = playerState.getLocation();
+  const newLocation = leaflet.latLng(currentLocation.lat + TILE_DEGREES, currentLocation.lng);
+  playerState.setLocation(newLocation);
+  movementHistory.push(playerState.getLocation());
   if (movementPolyline) {
     movementPolyline.setLatLngs(movementHistory);
   } else {
-    movementPolyline = leaflet.polyline(movementHistory, { color: 'blue' }).addTo(map);
+    movementPolyline = leaflet.polyline(movementHistory, { color: "blue" })
+      .addTo(map);
   }
   updateCaches();
   saveState();
 });
 
 document.getElementById("west").addEventListener("click", () => {
-  playerLocation = leaflet.latLng(playerLocation.lat, playerLocation.lng - TILE_DEGREES);
-  playerMarker.setLatLng(playerLocation);
-  map.setView(playerLocation);
-  movementHistory.push(playerLocation);
+  const currentLocation = playerState.getLocation();
+  const newLocation = leaflet.latLng(currentLocation.lat + TILE_DEGREES, currentLocation.lng);
+  playerState.setLocation(newLocation);
+  movementHistory.push(playerState.getLocation());
   if (movementPolyline) {
     movementPolyline.setLatLngs(movementHistory);
   } else {
-    movementPolyline = leaflet.polyline(movementHistory, { color: 'blue' }).addTo(map);
+    movementPolyline = leaflet.polyline(movementHistory, { color: "blue" })
+      .addTo(map);
   }
   updateCaches();
   saveState();
 });
 
 document.getElementById("east").addEventListener("click", () => {
-  playerLocation = leaflet.latLng(playerLocation.lat, playerLocation.lng + TILE_DEGREES);
-  playerMarker.setLatLng(playerLocation);
-  map.setView(playerLocation);
-  movementHistory.push(playerLocation);
+  const currentLocation = playerState.getLocation();
+  const newLocation = leaflet.latLng(currentLocation.lat + TILE_DEGREES, currentLocation.lng);
+  playerState.setLocation(newLocation);
+  movementHistory.push(playerState.getLocation());
   if (movementPolyline) {
     movementPolyline.setLatLngs(movementHistory);
   } else {
-    movementPolyline = leaflet.polyline(movementHistory, { color: 'blue' }).addTo(map);
+    movementPolyline = leaflet.polyline(movementHistory, { color: "blue" })
+      .addTo(map);
   }
   updateCaches();
   saveState();
@@ -286,7 +290,7 @@ updateCaches();
 
 const saveState = () => {
   const state = {
-    playerLocation,
+    playerLocation: playerState.getLocation(), // Fetch location from PlayerState
     playerPoints,
     playerCoins,
     cacheStates: Array.from(CacheMemento.cacheStates.entries()),
@@ -298,29 +302,40 @@ const saveState = () => {
 const loadState = () => {
   const state = localStorage.getItem("gameState");
   if (state) {
-    const { playerLocation: loc, playerPoints: points, playerCoins: coins, cacheStates, movementHistory: history } = JSON.parse(state);
-    playerLocation = leaflet.latLng(loc.lat, loc.lng);
+    const {
+      playerLocation: loc,
+      playerPoints: points,
+      playerCoins: coins,
+      cacheStates,
+      movementHistory: history,
+    } = JSON.parse(state);
+    const savedLocation = leaflet.latLng(loc.lat, loc.lng); // Create a LatLng object
+    playerState.setLocation(savedLocation); // Use PlayerState to restore location
     playerPoints = points;
     playerCoins = coins;
 
     // Clear existing cache states and add the new ones
     CacheMemento.clearStates();
     if (cacheStates) {
-      cacheStates.forEach(([key, value]) => {
-        CacheMemento.saveState(key, value);
-      });
+      cacheStates.forEach(
+        ([key, value]) => {
+          CacheMemento.saveState(key, value);
+        },
+      );
     }
 
-    movementHistory = history.map((latlng) => leaflet.latLng(latlng.lat, latlng.lng));
+    movementHistory = history.map((latlng) =>
+      leaflet.latLng(latlng.lat, latlng.lng)
+    );
 
-    playerMarker.setLatLng(playerLocation);
-    map.setView(playerLocation);
-    statusPanel.innerHTML = `${playerPoints} points accumulated, ${playerCoins} coins collected`;
+    statusPanel.innerHTML =
+      `${playerPoints} points accumulated, ${playerCoins} coins collected`;
 
     if (movementPolyline) {
       movementPolyline.setLatLngs(movementHistory);
     } else {
-      movementPolyline = leaflet.polyline(movementHistory, { color: 'blue' }).addTo(map);
+      movementPolyline = leaflet.polyline(movementHistory, { color: "blue" })
+        .addTo(map);
     }
   }
 };
@@ -335,16 +350,17 @@ document.getElementById("sensor").addEventListener("click", () => {
     watchId = navigator.geolocation.watchPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
-        playerLocation = leaflet.latLng(latitude, longitude);
-        playerMarker.setLatLng(playerLocation);
-        map.setView(playerLocation);
+        const currentLocation = leaflet.latLng(latitude, longitude); // Create new location object
+        playerState.setLocation(currentLocation); // Update PlayerState
 
         // Update movement history
-        movementHistory.push(playerLocation);
+        movementHistory.push(playerState.getLocation());
         if (movementPolyline) {
           movementPolyline.setLatLngs(movementHistory);
         } else {
-          movementPolyline = leaflet.polyline(movementHistory, { color: 'blue' }).addTo(map);
+          movementPolyline = leaflet.polyline(movementHistory, {
+            color: "blue",
+          }).addTo(map);
         }
 
         // Update caches around the new location
@@ -356,7 +372,7 @@ document.getElementById("sensor").addEventListener("click", () => {
       (error) => {
         console.error("Geolocation error:", error);
       },
-      { enableHighAccuracy: true }
+      { enableHighAccuracy: true },
     );
   } else {
     navigator.geolocation.clearWatch(watchId);
@@ -365,8 +381,10 @@ document.getElementById("sensor").addEventListener("click", () => {
 });
 
 document.getElementById("reset").addEventListener("click", () => {
-  const confirmation = prompt("Are you sure you want to erase your game state? Type 'yes' to confirm.");
-  if (confirmation === 'yes') {
+  const confirmation = prompt(
+    "Are you sure you want to erase your game state? Type 'yes' to confirm.",
+  );
+  if (confirmation === "yes") {
     // Reset player state
     playerPoints = 0;
     playerCoins = 0;
