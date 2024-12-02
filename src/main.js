@@ -242,7 +242,7 @@ document.getElementById("north").addEventListener("click", () => {
 
 document.getElementById("south").addEventListener("click", () => {
   const currentLocation = playerState.getLocation();
-  const newLocation = leaflet.latLng(currentLocation.lat + TILE_DEGREES, currentLocation.lng);
+  const newLocation = leaflet.latLng(currentLocation.lat - TILE_DEGREES, currentLocation.lng);
   playerState.setLocation(newLocation);
   movementHistory.push(playerState.getLocation());
   if (movementPolyline) {
@@ -257,7 +257,7 @@ document.getElementById("south").addEventListener("click", () => {
 
 document.getElementById("west").addEventListener("click", () => {
   const currentLocation = playerState.getLocation();
-  const newLocation = leaflet.latLng(currentLocation.lat + TILE_DEGREES, currentLocation.lng);
+  const newLocation = leaflet.latLng(currentLocation.lat, currentLocation.lng - TILE_DEGREES);
   playerState.setLocation(newLocation);
   movementHistory.push(playerState.getLocation());
   if (movementPolyline) {
@@ -272,7 +272,7 @@ document.getElementById("west").addEventListener("click", () => {
 
 document.getElementById("east").addEventListener("click", () => {
   const currentLocation = playerState.getLocation();
-  const newLocation = leaflet.latLng(currentLocation.lat + TILE_DEGREES, currentLocation.lng);
+  const newLocation = leaflet.latLng(currentLocation.lat, currentLocation.lng + TILE_DEGREES);
   playerState.setLocation(newLocation);
   movementHistory.push(playerState.getLocation());
   if (movementPolyline) {
