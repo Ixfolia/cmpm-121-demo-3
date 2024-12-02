@@ -47,10 +47,7 @@ leaflet
   .addTo(map);
 
 // Add a marker to represent the player
-let playerLocation = OAKES_CLASSROOM;
-const playerMarker = leaflet.marker(playerLocation);
-playerMarker.bindTooltip("That's you!");
-playerMarker.addTo(map);
+
 
 // Display the player's points and coins
 let playerPoints = 0;
@@ -229,8 +226,7 @@ const updateCaches = () => {
     }
   });
 
-  const playerLat = playerLocation.lat;
-  const playerLng = playerLocation.lng;
+  const { lat: playerLat, lng: playerLng } = playerState.getLocation(); // Fetch player location
 
   for (let i = -NEIGHBORHOOD_SIZE; i < NEIGHBORHOOD_SIZE; i++) {
     for (let j = -NEIGHBORHOOD_SIZE; j < NEIGHBORHOOD_SIZE; j++) {
@@ -253,7 +249,7 @@ document.getElementById("north")!.addEventListener("click", () => {
   const currentLocation = playerState.getLocation();
   const newLocation = leaflet.latLng(currentLocation.lat + TILE_DEGREES, currentLocation.lng);
   playerState.setLocation(newLocation);
-  movementHistory.push(playerLocation);
+  movementHistory.push(playerState.getLocation());
   if (movementPolyline) {
     movementPolyline.setLatLngs(movementHistory);
   } else {
@@ -268,7 +264,7 @@ document.getElementById("south")!.addEventListener("click", () => {
   const currentLocation = playerState.getLocation();
   const newLocation = leaflet.latLng(currentLocation.lat + TILE_DEGREES, currentLocation.lng);
   playerState.setLocation(newLocation);
-  movementHistory.push(playerLocation);
+  movementHistory.push(playerState.getLocation());
   if (movementPolyline) {
     movementPolyline.setLatLngs(movementHistory);
   } else {
@@ -283,7 +279,7 @@ document.getElementById("west")!.addEventListener("click", () => {
   const currentLocation = playerState.getLocation();
   const newLocation = leaflet.latLng(currentLocation.lat + TILE_DEGREES, currentLocation.lng);
   playerState.setLocation(newLocation);
-  movementHistory.push(playerLocation);
+  movementHistory.push(playerState.getLocation());
   if (movementPolyline) {
     movementPolyline.setLatLngs(movementHistory);
   } else {
@@ -298,7 +294,7 @@ document.getElementById("east")!.addEventListener("click", () => {
   const currentLocation = playerState.getLocation();
   const newLocation = leaflet.latLng(currentLocation.lat + TILE_DEGREES, currentLocation.lng);
   playerState.setLocation(newLocation);
-  movementHistory.push(playerLocation);
+  movementHistory.push(playerState.getLocation());
   if (movementPolyline) {
     movementPolyline.setLatLngs(movementHistory);
   } else {
@@ -314,7 +310,7 @@ updateCaches();
 
 const saveState = () => {
   const state = {
-    playerLocation,
+    playerLocation: playerState.getLocation(), // Fetch location from PlayerState
     playerPoints,
     playerCoins,
     cacheStates: Array.from(CacheMemento.cacheStates.entries()),
@@ -333,7 +329,8 @@ const loadState = () => {
       cacheStates,
       movementHistory: history,
     } = JSON.parse(state);
-    playerLocation = leaflet.latLng(loc.lat, loc.lng);
+    const savedLocation = leaflet.latLng(loc.lat, loc.lng); // Create a LatLng object
+    playerState.setLocation(savedLocation); // Use PlayerState to restore location
     playerPoints = points;
     playerCoins = coins;
 
@@ -351,8 +348,6 @@ const loadState = () => {
       leaflet.latLng(latlng.lat, latlng.lng)
     );
 
-    playerState.setLocation(playerLocation); // Updates both the marker and the internal state
-    playerState.setLocation(playerLocation); // Automatically updates `map.setView` internally
     statusPanel.innerHTML =
       `${playerPoints} points accumulated, ${playerCoins} coins collected`;
 
@@ -375,12 +370,11 @@ document.getElementById("sensor")!.addEventListener("click", () => {
     watchId = navigator.geolocation.watchPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
-        playerLocation = leaflet.latLng(latitude, longitude);
-        playerState.setLocation(playerLocation); // Updates both the marker and the internal state
-        playerState.setLocation(playerLocation); // Automatically updates `map.setView` internally
+        const currentLocation = leaflet.latLng(latitude, longitude); // Create new location object
+        playerState.setLocation(currentLocation); // Update PlayerState
 
         // Update movement history
-        movementHistory.push(playerLocation);
+        movementHistory.push(playerState.getLocation());
         if (movementPolyline) {
           movementPolyline.setLatLngs(movementHistory);
         } else {
